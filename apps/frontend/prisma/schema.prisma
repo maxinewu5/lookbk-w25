@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// TODO: add anything else you might need for a video object
+
+model Video {
+    id String @id @default(uuid())
+    name String
+    url String
+    prompt String
+    reaction String
+    demoType String
+    
+}
