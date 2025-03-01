@@ -1,8 +1,9 @@
  # pip install runwayml
 from runwayml import RunwayML
+import time
 
 # The env var RUNWAYML_API_SECRET is expected to contain your API key.
-client = RunwayML(api_key="key_c2d89faa4a5ca2f054884141e2f10d1586cd93679f13b3d5f1360aea89edf70ba30014136677bdf5f9c458d96704b0515a754d2fb72bce4b4dfd1275b8ca1c01key_c2d89faa4a5ca2f054884141e2f10d1586cd93679f13b3d5f1360aea89edf70ba30014136677bdf5f9c458d96704b0515a754d2fb72bce4b4dfd1275b8ca1c01")
+client = RunwayML(api_key="RUNWAYML_API_SECRET")
 # change this to env variable later
 
 
@@ -12,3 +13,13 @@ task = client.image_to_video.create(
   prompt_text='The bunny is eating a carrot',
 )
 print(task.id)
+
+task_id = task.id 
+
+time.sleep(10)  # Wait for a second before polling
+task = client.tasks.retrieve(task_id)
+while task.status not in ['SUCCEEDED', 'FAILED']:
+  time.sleep(10)  # Wait for ten seconds before polling
+  task = client.tasks.retrieve(task_id)
+
+print('Task complete:', task)
