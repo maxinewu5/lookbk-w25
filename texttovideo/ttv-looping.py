@@ -31,7 +31,7 @@ def grab_output(link):
     with open(video_filename, "wb") as file:
       for chunk in response.iter_content(1024):
         file.write(chunk)
-        print(f"Download complete: {video_filename}")
+      print(f"Download complete: {video_filename}")
   else:
     print("Failed to download the video.")
 
@@ -69,4 +69,3 @@ for file in files_array:
   else:
     print("task failed")
     print(file)
-  
