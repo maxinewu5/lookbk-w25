@@ -1,0 +1,4 @@
+.env
+texttovideo/.env
+texttovideo/stockimages/*
+texttovideo/outputvideos/*
