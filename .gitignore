@@ -1,4 +1,7 @@
+# Ignore environment files
 .env
 texttovideo/.env
+
+# Ignore files in stockimages and outputvideos folders
 texttovideo/stockimages/*
 texttovideo/outputvideos/*
