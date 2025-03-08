@@ -8,74 +8,67 @@ import zipfile
 import tempfile
 from tempfile import mkdtemp
 
-def create_text_clip(text, size, font_size=70, font_name='Arial', text_color=(255, 255, 255, 255), outline_color=(0, 0, 0, 255)):
-    # Create a transparent image
+def create_text_clip(text, size, font_size=100, font_name='Arial', text_color=(255, 255, 255, 255), outline_color=(0, 0, 0, 255)):
+    # transparent image for background
     img = Image.new('RGBA', size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
-    # Load font
+    # load font (will be default Arial)
     try:
         font = ImageFont.truetype(font_name, font_size)
     except:
         font = ImageFont.load_default()
     
-    # Get text size
     left, top, right, bottom = font.getbbox(text)
     text_width = right - left
     text_height = bottom - top
-    
-    # Calculate text position to center it
+
     x = (size[0] - text_width) // 2
     y = (size[1] - text_height) // 2
     
-    # Draw text with outline
-    for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1)]:
+    # outline
+    offsets = [(2,0), (-2,0), (0,2), (0,-2), (2,2), (-2,-2), (2,-2), (-2,2), (1,2), (-1,2), (2,1), (2,-1), (-2,1), (-2,-1), (1,-2), (-1,-2)]
+    for offset_x, offset_y in offsets:
         draw.text((x + offset_x, y + offset_y), text, font=font, fill=outline_color)
     draw.text((x, y), text, font=font, fill=text_color)
     
     return np.array(img)
 
-def add_caption_to_video(video_path, output_path, caption_text, start_time = None, duration = None,
-                     font_size = 70, font_name = 'Arial', position = 'center',
+def add_caption_to_video(video_path, output_path, caption_text, 
+                     font_size = 100, position = 'center',
                      text_color = (255, 255, 255, 255), outline_color = (0, 0, 0, 255),
                      fade_duration = 0.5):
-    # Load the video
+    # load the video
     video = VideoFileClip(video_path)
     
+    # set caption to show for the entire video duration
+    start_time = 0
+    duration = video.duration
     
-    # Calculate start time if not specified
-    if start_time is None:
-        start_time = video.duration / 3
+    # create text frame - always using Arial font
+    text_frame = create_text_clip(caption_text, video.size, font_size, 'Arial', text_color, outline_color)
     
-    # Set duration if not specified
-    if duration is None:
-        duration = video.duration / 3
-    
-    # Create text frame
-    text_frame = create_text_clip(caption_text, video.size, font_size, font_name, text_color, outline_color)
-    
-    # Create text clip
+    # create text clip
     txt_clip = (ImageClip(text_frame)
-               .set_duration(duration)
-               .set_position(position)
-               .set_start(start_time)
-               .crossfadein(fade_duration)
-               .crossfadeout(fade_duration))
+                .set_duration(duration)
+                .set_position(position)
+                .set_start(start_time)
+                .crossfadein(fade_duration)
+                .crossfadeout(fade_duration))
     
-    # Overlay text on video
+    # overlay text on video
     final = CompositeVideoClip([video, txt_clip])
     
 
-    # Write output keeping original format
+    # write output keeping original format
     final.write_videofile(output_path,
                          codec='libx264')
     
-
-    # Clean up
+    # clean up
     video.close()
     final.close()
 
-def bulk_add_caption_to_video(zip_file, caption_file, output_dir):
+def bulk_add_caption_to_video(zip_file, caption_file, output_dir, font_size=70, position='center'):
     extracted_videos = mkdtemp()
     temp_output = mkdtemp()
 
@@ -101,11 +94,10 @@ def bulk_add_caption_to_video(zip_file, caption_file, output_dir):
                 if (file.lower().endswith(video_extensions)):
                     full_path = os.path.join(root, file)
                     videos.append(full_path)
-                    print(f"Appending: {Path(file).stem} (Full path: {full_path})")
 
         # if number of videos and number of captions are different, then terminate
         if len(videos) != len(captions): 
-            print(f"Error: Mismatch! {len(videos)} videos but {len(captions)} captions.")
+            print(f"Mismatch! {len(videos)} videos but {len(captions)} captions.")
             return
         
         # processing video with its caption pair
@@ -119,8 +111,8 @@ def bulk_add_caption_to_video(zip_file, caption_file, output_dir):
                     video_path=video_file,  # Already have full path
                     output_path=output_path,
                     caption_text=caption,
-                    start_time=None,
-                    duration=None
+                    font_size=font_size,
+                    position=position
                 )
 
                 tqdm.write(f"✓ Processed: {video_name}")
@@ -129,20 +121,18 @@ def bulk_add_caption_to_video(zip_file, caption_file, output_dir):
                 tqdm.write(f"✗ Error processing {video_name}: {str(e)}")
 
 if __name__ == "__main__":
-    # Get the directory where this script is located
+    # get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Build full paths
     input_video = os.path.join(script_dir, "videos.zip")
     output_videos = os.path.join(script_dir, "with_captions")
     caption_file = os.path.join(script_dir, "captions.txt")
     
-    print(f"Looking for files in: {script_dir}")
-    print(f"Video file: {input_video}")
-    print(f"Caption file: {caption_file}")
-    
+    # frontend UI will supply parameters as needed
     bulk_add_caption_to_video(
         zip_file = input_video,
         caption_file = caption_file,
-        output_dir = output_videos
+        output_dir = output_videos,
+        font_size = 100,  # default font size
+        position = 'center'  # default position
     )
