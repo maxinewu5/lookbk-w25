@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { VideoService } from "@/lib/video-service"
+
+const videoService = new VideoService()
 
 export async function POST(req: Request) {
   try {
@@ -12,23 +15,28 @@ export async function POST(req: Request) {
       )
     }
 
-    // this will likely just hit an endpoint you guys generate
-
-    // Mock multiple generated options
-    const generatedOptions = Array.from({ length: 3 }, (_, i) => ({
-      id: `${Date.now()}-${i}`,
-      name: `generated-${Date.now()}-${i}.mp4`,
-      url: videoUrl, // In real implementation, these would be different generated videos
-      prompt,
-      reaction: reactionType,
-      demoType,
-      createdAt: new Date().toISOString(),
-      previewUrl: videoUrl, // This would be a preview/thumbnail in real implementation
-      description: `Option ${i + 1}: Generated video with ${reactionType} reaction`,
-    }))
-
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    // Generate multiple video options using our video service
+    const generatedOptions = await Promise.all(
+      Array.from({ length: 3 }, async (_, i) => {
+        const result = await videoService.generateReactionVideo(
+          videoUrl,
+          reactionType,
+          demoType,
+          `${prompt} (variation ${i + 1})`
+        )
+        return {
+          id: result.id,
+          name: `generated-${Date.now()}-${i}.mp4`,
+          url: result.url,
+          prompt: result.prompt,
+          reaction: result.reaction,
+          demoType: result.demoType,
+          createdAt: new Date().toISOString(),
+          previewUrl: result.previewUrl,
+          description: result.description,
+        }
+      })
+    )
 
     return NextResponse.json({ 
       options: generatedOptions,
