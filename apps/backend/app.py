@@ -9,7 +9,11 @@ import os
 from dotenv import load_dotenv
 from caption_generator import CaptionGenerator
 from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
+from apps.backend.bulk_overlay import bulk_add_caption_to_video
+from apps.backend import stitch
+
 from text_overlay import text_overlay
+
 from prisma import Prisma
 
 # Load environment variables
@@ -95,6 +99,8 @@ def textoverlay(captions, videos):
     
     # urls with captions
     return videos_with_captions
+
+stitch.process_videos()
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
