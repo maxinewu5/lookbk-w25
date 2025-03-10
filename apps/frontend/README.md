@@ -38,6 +38,7 @@ yarn dev
 - `npm run build` - Create a production build
 - `npm run start` - Start the production server
 - `npm run lint` - Run ESLint for code quality checks
+- `npm run prisma:generate` - Update DB
 
 ## Tech Stack
 

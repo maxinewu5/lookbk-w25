@@ -12,6 +12,7 @@ import GeneratedVideos from "@/components/generated-videos"
 import ClipCombiner from "@/components/clip-combiner"
 import VideoMatcher from "@/components/video-matcher"
 import { toast } from "sonner"
+import VideoGallery from "@/components/video-gallery"
 
 interface GeneratedOption {
   id: string
@@ -43,7 +44,7 @@ export default function Dashboard() {
   const [selectedHook, setSelectedHook] = useState<GeneratedOption | null>(null)
   const [originalVideo, setOriginalVideo] = useState<GeneratedOption | null>(null)
 
-  const handleVideoUpload = (videoUrl: string) => {
+  const handleVideoUpload = async (videoUrl: string) => {
     setCurrentVideo(videoUrl)
   }
 
@@ -310,7 +311,7 @@ export default function Dashboard() {
           )}
 
           {activeTab === "view" && !showCombiner && (
-            <GeneratedVideos videos={generatedVideos} />
+            <VideoGallery />
           )}
 
           {activeTab === "view" && showCombiner && (

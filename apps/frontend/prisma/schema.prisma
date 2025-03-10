@@ -3,12 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "mysql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
-
-// TODO: add anything else you might need for a video object
 
 model Video {
     id String @id @default(uuid())
@@ -17,5 +15,10 @@ model Video {
     prompt String
     reaction String
     demoType String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
     
+    @@index([reaction])
+    @@index([demoType])
+    @@index([createdAt])
 }
