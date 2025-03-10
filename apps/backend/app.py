@@ -35,6 +35,12 @@ class Video(db.Model):
     s3_url = db.Column(db.String(500), nullable=False)
     created = db.Column(db.DateTime, default=datetime.utcnow)
 
+class DemoVideo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    s3_url = db.Column(db.String(500), nullable=False)
+    uploaded = db.Column(db.DateTime, default=datetime.utcnow)
+
 with app.app_context():
     db.create_all()
 
@@ -70,6 +76,55 @@ def generate_videos():
     except Exception as e:
         db.session.rollback()  
         return jsonify({"error": str(e)}), 500
+
+import boto3
+
+@app.route("/api/upload_demo", methods=["POST"])
+def upload_demo():
+    try:
+        # S3 bucket details
+        S3_BUCKET = "lookbk-video-bucket"
+        S3_REGION = "us-west-1"
+        AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
+        AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')
+
+        # Validate if file is in request
+        if "file" not in request.files:
+            return jsonify({"error": "No file part"}), 400
+
+        file = request.files["file"]
+
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        # Generate a unique filename
+        filename = f"{uuid.uuid4()}_{file.filename}"
+
+        # Upload to S3
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=AWS_ACCESS_KEY,
+            aws_secret_access_key=AWS_SECRET_KEY,
+            region_name=S3_REGION,
+        )
+
+        s3.upload_fileobj(file, S3_BUCKET, filename)
+
+        # Construct S3 file URL
+        s3_url = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{filename}"
+
+        # Save to database
+        new_demo_video = DemoVideo(filename=filename, s3_url=s3_url)
+        db.session.add(new_demo_video)
+        db.session.commit()
+
+        return jsonify({"message": "Video uploaded successfully", "s3_url": s3_url}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+        
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
