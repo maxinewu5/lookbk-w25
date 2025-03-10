@@ -9,6 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 
 from dotenv import load_dotenv
+import stitch
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
@@ -21,7 +22,7 @@ RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
 RDS_DB = "videosdb"
 #change these codes to .env later
 
-#s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
 #logging into RDS
 app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{RDS_ENDPOINT}/{RDS_DB}"
@@ -57,8 +58,8 @@ def generate_videos():
         for videos in videos_to_add:
             new_video = Video(filename=filename, prompt=prompt, s3_url=s3_url)
             db.session.add(new_video)  # Add to DB session
-            uploaded_videos.append({
-                "filename": video.split("/")[-1],
+            uploaded_vids.append({
+                "filename": videos.split("/")[-1],
                 "s3_url": videos,
                 "prompt": prompt,
                 "created": new_video.created
@@ -70,6 +71,48 @@ def generate_videos():
     except Exception as e:
         db.session.rollback()  
         return jsonify({"error": str(e)}), 500
+
+#create processed video class
+class ProcessedVideo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    s3_url = db.Column(db.String(500), nullable=False)
+    created = db.Column(db.DateTime, default=datetime.utcnow)
+
+@app.route("/api/process-videos", methods=["GET"])
+def process_videos():
+    try:
+        hooks = []
+        demos = []
+        videos = Video.query.all()
+        demoVideos = DemoVideo.query.all()
+
+        #retrieve s3 urls for hooks and demos
+        hooks = [video.s3_url for video in videos]
+        demos = [demo.s3_url for demo in demoVideos]
+
+        processed_videos = stitch.upload_video(hooks, demos)
+        hook_list, demo_list = processed_videos
+
+        #stitch processed videos
+        stitches = stitch.stitch_videos(hook_list, demo_list)
+
+        for video_url in stitches:
+            filename = video_url.split("/")[-1]
+            new_processed_video = ProcessedVideo(
+                filename=filename,
+                s3_url=video_url
+            )
+
+            # Add to the database session
+            db.session.add(new_processed_video)
+
+            # Commit the transaction to save the stitched videos
+        db.session.commit()
+        return jsonify({"message": "Videos stitched and stored successfully", "videos": stitches}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
