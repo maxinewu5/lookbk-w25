@@ -32,14 +32,13 @@ def stitch_videos(hooks, demos):
     return stitched #returns list of stitched video clips
 
 #organizes hooks and demos into lists to be stitched together
-def upload_video(hook_list, demo_path):
+def upload_video(hook_list, demo_list):
     #download hook videos from AWS
     for i in range(len(hook_list)):
-        hook_files = [download_video(hook_list[i],f"vid{i}.mp4")]
+        hook_files = [download_video(hook_list[i],f"hvid{i}.mp4")]
     #demo video upload
-    folder_path = os.path.abspath(demo_path)  # Change this to folder containing videos
-    demo_files = sorted(
-        [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith((".mp4", ".mov"))])
+    for i in range(len(demo_list)):
+        demo_files = [download_video(demo_list[i], f"dvid{i}.mp4")
 
     #if they aren't able to be uploaded, raise error
     if not demo_files:
