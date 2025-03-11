@@ -13,6 +13,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+from apps.backend.bulk_overlay import bulk_add_caption_to_video
 
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASS = os.getenv('MYSQL_PASS')
