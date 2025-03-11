@@ -1,6 +1,7 @@
 from runwayml import RunwayML
 from dotenv import load_dotenv
 import os
+import time
 
 def runwayml_login():
   load_dotenv()
@@ -17,32 +18,39 @@ def generate_files_array():
 import requests
 import boto3
 import uuid
+from botocore.config import Config
+
 def grab_video(link, names3):
   #s3 bucket information and access
+  load_dotenv()
   S3_BUCKET = "lookbk-video-bucket"
   S3_REGION = "us-west-1"
   AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
   AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')
   #video_filename = os.path.join(output_folder, link.split("/")[-1].split("?")[0])
 
-  response = requests.get(link, stream=True)
+  if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
+    raise ValueError("AWS credentials not found. Check your .env file or environment variables.")
 
   s3_client = boto3.client(
     "s3",
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_KEY,
-    region_name=S3_REGION
+    region_name=S3_REGION,
+    config=Config(signature_version="s3v4")
   )
 
-  s3_client.put_object(
-    Bucket=S3_BUCKET,
-    Key=names3,
-    Body=response.raw,  # Stream response directly to S3
-    ContentType="video/mp4"  # Change if different video format
-  )
-  s3_url = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{filename}"
+  # Stream video from URL
+  response = requests.get(link, stream=True)
+  response.raise_for_status()
+
+  # Upload directly to S3
+  s3_client.upload_fileobj(response.raw, S3_BUCKET, names3, ExtraArgs={"ContentType": "video/mp4"})
+
+  # Construct and return the S3 URL
+  s3_url = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{names3}"
   print(f"Upload complete: {s3_url}")
-  return s3_url  # Return S3 URL
+  return s3_url
 
 
 import base64
