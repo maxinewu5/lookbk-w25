@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import List, Dict, Any
 import uuid
 from flask_sqlalchemy import SQLAlchemy
+from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
+
 import os
 
 from dotenv import load_dotenv
@@ -38,10 +40,6 @@ class Video(db.Model):
 with app.app_context():
     db.create_all()
 
-#importing all the needed files
-
-from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
-
 @app.route("/api/generate-videos", methods=["POST"])
 def generate_videos():
     try:
@@ -52,11 +50,11 @@ def generate_videos():
 
         videos_to_add = generate_hooks(client, prompt, files_array)
 
-        uploaded_vids = []
+        uploaded_videos = []
 
         for videos in videos_to_add:
-            filename = video.split("/")[-1]
-            s3_url = video # need to check
+            filename = videos.split("/")[-1]
+            s3_url = videos # need to check
             new_video = Video(filename=filename, prompt=prompt, s3_url=s3_url)
             db.session.add(new_video)  # Add to DB session
             uploaded_videos.append({
