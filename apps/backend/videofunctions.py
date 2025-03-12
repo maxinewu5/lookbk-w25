@@ -1,5 +1,6 @@
 from runwayml import RunwayML
 from dotenv import load_dotenv
+load_dotenv()
 import os
 import time
 
