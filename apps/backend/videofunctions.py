@@ -1,11 +1,17 @@
 from runwayml import RunwayML
-from dotenv import load_dotenv
-load_dotenv()
 import os
 import time
+import requests
+import boto3
+import uuid
+from botocore.config import Config
+import base64
+from dotenv import load_dotenv
+load_dotenv()
+
+
 
 def runwayml_login():
-  load_dotenv()
   RUNWAYML_API_KEY = os.getenv('RUNWAYML_API_KEY')
   RUNWAYML_API_SECRET = RUNWAYML_API_KEY
   client = RunwayML(api_key=RUNWAYML_API_SECRET)
@@ -16,14 +22,8 @@ def generate_files_array():
   files_array = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
   return files_array
 
-import requests
-import boto3
-import uuid
-from botocore.config import Config
-
 def grab_video(link, names3):
   #s3 bucket information and access
-  load_dotenv()
   S3_BUCKET = "lookbk-video-bucket"
   S3_REGION = "us-west-1"
   AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
@@ -54,7 +54,6 @@ def grab_video(link, names3):
   return s3_url
 
 
-import base64
 def encode_image(image_path):
   with open(image_path, "rb") as img_file:
     return "data:image/png;base64," + base64.b64encode(img_file.read()).decode('utf-8')
