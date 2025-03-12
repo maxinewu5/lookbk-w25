@@ -56,10 +56,12 @@ def generate_videos():
         uploaded_vids = []
 
         for videos in videos_to_add:
+            filename = video.split("/")[-1]
+            s3_url = video # need to check
             new_video = Video(filename=filename, prompt=prompt, s3_url=s3_url)
             db.session.add(new_video)  # Add to DB session
             uploaded_videos.append({
-                "filename": video.split("/")[-1],
+                "filename": filename,
                 "s3_url": videos,
                 "prompt": prompt,
                 "created": new_video.created
