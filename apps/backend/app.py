@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import boto3
 import time
+from datetime import datetime
 from typing import List, Dict, Any
 import uuid
 from flask_sqlalchemy import SQLAlchemy
@@ -13,9 +15,8 @@ from dotenv import load_dotenv
 import os
 from caption_generator import CaptionGenerator
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-
 app = Flask(__name__)
 CORS(app)
 
@@ -46,6 +47,19 @@ with app.app_context():
 
 # Initialize caption generator
 caption_generator = CaptionGenerator()
+
+class Video(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    prompt = db.Column(db.String(255), nullable=False)
+    s3_url = db.Column(db.String(500), nullable=False)
+    created = db.Column(db.DateTime, default=datetime.utcnow)
+
+with app.app_context():
+    db.create_all()
+
+# Import video generation functions
+from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
 
 @app.route("/api/generate-videos", methods=["POST"])
 def generate_videos():
