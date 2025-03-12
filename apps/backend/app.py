@@ -9,6 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
 from caption_generator import CaptionGenerator
+from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
 
 # Load environment variables
 load_dotenv()
@@ -39,9 +40,6 @@ class Video(db.Model):
 with app.app_context():
     db.create_all()
 
-# Import video generation functions
-from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
-
 @app.route("/api/generate-videos", methods=["POST"])
 def generate_videos():
     try:
@@ -50,23 +48,24 @@ def generate_videos():
         prompt = request.json.get("prompt", "person jumping with joy")
 
         videos_to_add = generate_hooks(client, prompt, files_array)
+        uploaded_videos = []
 
-        uploaded_vids = []
-
-        for videos in videos_to_add:
-            new_video = Video(filename=filename, prompt=prompt, s3_url=s3_url)
-            db.session.add(new_video)  # Add to DB session
+        for video_url in videos_to_add:
+            filename = video_url.split("/")[-1]
+            new_video = Video(filename=filename, prompt=prompt, s3_url=video_url)
+            db.session.add(new_video)
             uploaded_videos.append({
-                "filename": video.split("/")[-1],
-                "s3_url": videos,
+                "filename": filename,
+                "s3_url": video_url,
                 "prompt": prompt,
-                "created": new_video.created
+                "created": new_video.created.isoformat()
             })
+        
         db.session.commit()
-        return jsonify({"message": "Videos generated and stored successfully", "videos": videos_to_add}), 201
+        return jsonify({"message": "Videos generated and stored successfully", "videos": uploaded_videos}), 201
 
     except Exception as e:
-        db.session.rollback()  
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/generate-captions", methods=["POST"])
