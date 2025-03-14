@@ -1,6 +1,7 @@
 import openai
 import os
 from typing import List, Optional
+from flask import request, jsonify
 
 class CaptionGenerator:
     def __init__(self):
@@ -9,13 +10,13 @@ class CaptionGenerator:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
         openai.api_key = self.api_key
 
-    def generate_captions(self, video_type: str, num_captions: int = 15) -> List[str]:
+    def generate_captions(self, video_type: str, num_captions: int = 3) -> List[str]:
         """
         Generate engaging TikTok overlay captions for a video.
         
         Args:
             video_type (str): Type of video to generate captions for
-            num_captions (int): Number of captions to generate (default: 15)
+            num_captions (int): Number of captions to generate (default: 3)
             
         Returns:
             List[str]: List of generated captions
@@ -31,18 +32,31 @@ Use **current TikTok slang, humor, or viral phrases**.
         """
 
         try:
-            client = openai.OpenAI()
-            response = client.chat.completions.create(
-                model="gpt-4-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a creative assistant."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
+            # Use the appropriate OpenAI client based on the installed version
+            try:
+                # For newer versions of the OpenAI library
+                client = openai.OpenAI()
+                response = client.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a creative assistant."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7
+                )
+                captions_text = response.choices[0].message.content.strip()
+            except AttributeError:
+                # For older versions of the OpenAI library
+                response = openai.ChatCompletion.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a creative assistant."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7
+                )
+                captions_text = response['choices'][0]['message']['content'].strip()
 
-            # Extract and clean captions
-            captions_text = response.choices[0].message.content.strip()
             # Split by newlines and clean up numbering
             captions = [
                 line.split(". ", 1)[1] if ". " in line else line
@@ -53,8 +67,8 @@ Use **current TikTok slang, humor, or viral phrases**.
             return captions
 
         except Exception as e:
-            print(f"Error generating captions: {str(e)}")
-            return []
+            # Throw the error instead of returning an empty list
+            raise Exception(f"Error generating captions: {str(e)}")
 
     def save_captions_to_file(self, captions: List[str], output_file: str = "captions.txt") -> Optional[str]:
         """
@@ -73,5 +87,20 @@ Use **current TikTok slang, humor, or viral phrases**.
                     f.write(f"{i}. {caption}\n")
             return output_file
         except Exception as e:
-            print(f"Error saving captions: {str(e)}")
-            return None 
+            raise Exception(f"Error saving captions: {str(e)}")
+
+    def generate_captions_from_prompt(self, prompt: str, num_captions: int = 3) -> List[str]:
+        """
+        Generate captions based on a prompt string.
+        
+        Args:
+            prompt (str): The prompt to generate captions for
+            num_captions (int): Number of captions to generate (default: 3)
+            
+        Returns:
+            List[str]: List of generated captions
+        """
+        if not prompt:
+            raise ValueError("Prompt is required")
+        
+        return self.generate_captions(prompt, num_captions)
