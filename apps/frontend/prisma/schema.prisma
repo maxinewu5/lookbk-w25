@@ -22,3 +22,10 @@ model Video {
     @@index([demoType])
     @@index([createdAt])
 }
+
+model DemoVideo {
+    id String @id @default(uuid())
+    name String
+    url String
+    createdAt DateTime @default(now())
+}
