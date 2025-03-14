@@ -13,6 +13,8 @@ const s3Client = new S3Client({
 
 export async function POST(req: Request) {
   try {
+    const { prompt, reactionType, demoType } = await req.json()
+
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.mp4`
 
     // Create the S3 upload command
@@ -26,10 +28,13 @@ export async function POST(req: Request) {
     const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 })
     
     // Create video record in database
-    const video = await prisma.demoVideo.create({
+    const video = await prisma.video.create({
       data: {
         name: fileName,
         url: `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/${fileName}`,
+        prompt: prompt,
+        reaction: reactionType,
+        demoType: demoType,
       },
     })
 

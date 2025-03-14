@@ -12,26 +12,65 @@ export async function POST(req: Request) {
       )
     }
 
-    // this will likely just hit an endpoint you guys generate
+    // Generate videos from backend
+    const generatedResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/generate-videos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ videoUrl, prompt, reactionType, demoType }),
+    })
 
-    // Mock multiple generated options
-    const generatedOptions = Array.from({ length: 3 }, (_, i) => ({
-      id: `${Date.now()}-${i}`,
-      name: `generated-${Date.now()}-${i}.mp4`,
-      url: videoUrl, // In real implementation, these would be different generated videos
-      prompt,
-      reaction: reactionType,
-      demoType,
-      createdAt: new Date().toISOString(),
-      previewUrl: videoUrl, // This would be a preview/thumbnail in real implementation
-      description: `Option ${i + 1}: Generated video with ${reactionType} reaction`,
-    }))
+    if (!generatedResponse.ok) {
+      throw new Error('Failed to generate videos')
+    }
 
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    const generatedOptions = await generatedResponse.json()
+
+    // Upload each generated video to S3
+    const uploadedVideos = await Promise.all(
+      generatedOptions.map(async (option: any) => {
+        const uploadResponse = await fetch('/api/upload-generated', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            reactionType,
+            demoType,
+          }),
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to get upload URL')
+        }
+
+        const { signedUrl, video } = await uploadResponse.json()
+
+        // Upload video to S3
+        const uploadResult = await fetch(signedUrl, {
+          method: 'PUT',
+          body: option.videoData,
+          headers: {
+            'Content-Type': 'video/mp4',
+          },
+        })
+
+        if (!uploadResult.ok) {
+          throw new Error('Failed to upload to S3')
+        }
+
+        return {
+          ...video,
+          url: video.url,
+          name: video.name,
+        }
+      })
+    )
 
     return NextResponse.json({ 
-      options: generatedOptions,
+      options: uploadedVideos,
       originalVideo: {
         id: 'original',
         url: videoUrl,

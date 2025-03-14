@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 from caption_generator import CaptionGenerator
 from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
+from text_overlay import text_overlay
 
 # Load environment variables
 load_dotenv()
@@ -19,6 +20,16 @@ CORS(app)
 # Database configuration
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASS = os.getenv('MYSQL_PASS')
+
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
+BUCKET_NAME = os.getenv("S3_BUCKET")
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY
+)
+
 RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
 RDS_DB = "videosdb"
 
@@ -76,16 +87,31 @@ def generate_videos():
         
         db.session.commit()
         
+        # Apply text overlay to videos
+        videos_with_caption = textoverlay(captions, [video["s3_url"] for video in uploaded_videos])
+        
         # Return both videos and captions
         return jsonify({
             "message": "Videos and captions generated successfully", 
             "videos": uploaded_videos,
+            "videos_with_captions": videos_with_caption,
             "captions": captions
         }), 201
 
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+def textoverlay(captions, videos):
+    videos_with_captions = []
+
+    for caption, video in zip(captions, videos):
+        s3_key = video.split("/")[-1]
+        processed_s3_url = text_overlay(s3, BUCKET_NAME, s3_key, caption)
+        videos_with_captions.append(processed_s3_url)
+    
+    # urls with captions
+    return videos_with_captions
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000) 
