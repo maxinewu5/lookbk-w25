@@ -9,8 +9,6 @@ import { Textarea } from "@/components/ui/textarea"
 import VideoUploader from "@/components/video-uploader"
 import VideoPreview from "@/components/video-preview"
 import GeneratedVideos from "@/components/generated-videos"
-import ClipCombiner from "@/components/clip-combiner"
-import VideoMatcher from "@/components/video-matcher"
 import { toast } from "sonner"
 import VideoGallery from "@/components/video-gallery"
 
@@ -72,16 +70,15 @@ export default function Dashboard() {
       }
 
       const data = await response.json()
-      setGeneratedOptions(data.options)
-      setOriginalVideo({
-        id: 'original',
-        url: currentVideo,
-        name: 'Original Demo Video',
-        prompt,
-        reaction: reactionType,
-        demoType
-      })
-      setShowMatcher(true)
+      
+      setActiveTab("view")
+      toast.success("Videos generated successfully!")
+      
+      setCurrentVideo(null)
+      setPrompt("")
+      setGeneratedOptions([])
+      setOriginalVideo(null)
+      
     } catch (error) {
       console.error("Error generating video:", error)
       toast.error("Failed to generate video", {
@@ -298,24 +295,8 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
-          {activeTab === "generate" && showMatcher && originalVideo && (
-            <VideoMatcher
-              originalVideo={originalVideo}
-              generatedOptions={generatedOptions}
-              onComplete={handleMatchingComplete}
-              onCancel={handleMatchingCancel}
-              step={matcherStep}
-              selectedHook={selectedHook}
-            />
-          )}
-
           {activeTab === "view" && !showCombiner && (
             <VideoGallery />
-          )}
-
-          {activeTab === "view" && showCombiner && (
-            <ClipCombiner videos={generatedVideos} />
           )}
 
           {isGenerating && (
