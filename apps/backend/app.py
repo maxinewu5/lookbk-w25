@@ -20,14 +20,14 @@ CORS(app)
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASS = os.getenv('MYSQL_PASS')
 RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
-RDS_DB = os.getenv('RDS_DB')
+RDS_DB = "videosdb"
 
 # Configure SQLAlchemy
 app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{RDS_ENDPOINT}/{RDS_DB}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
-# Initialize caption generator
+# Initialize services
 caption_generator = CaptionGenerator()
 
 class Video(db.Model):
@@ -57,7 +57,6 @@ def generate_videos():
         client = runwayml_login()
         files_array = generate_files_array()
         videos_to_add = generate_hooks(client, prompt, files_array)
-
         uploaded_videos = []
 
         for video_url in videos_to_add:
@@ -86,6 +85,41 @@ def generate_videos():
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/generate-captions", methods=["POST"])
+def generate_captions():
+    """
+    Generate captions for a video based on its type.
+    
+    Expected JSON payload:
+    {
+        "video_type": str,
+        "num_captions": int (optional)
+    }
+    """
+    try:
+        data = request.json
+        if not data or "video_type" not in data:
+            return jsonify({"error": "Missing video_type in request"}), 400
+            
+        video_type = data["video_type"]
+        num_captions = data.get("num_captions", 15)  # Default to 15 captions if not specified
+        
+        # Generate captions
+        captions = caption_generator.generate_captions(video_type, num_captions)
+        
+        if not captions:
+            return jsonify({"error": "Failed to generate captions"}), 500
+            
+        # Return the generated captions
+        return jsonify({
+            "captions": captions,
+            "video_type": video_type,
+            "count": len(captions)
+        })
+        
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
