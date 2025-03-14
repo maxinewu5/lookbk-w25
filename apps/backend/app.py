@@ -8,6 +8,7 @@ import uuid
 from flask_sqlalchemy import SQLAlchemy
 from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
 from apps.backend.bulk_overlay import bulk_add_caption_to_video
+from text_overlay import text_overlay
 import os
 
 from dotenv import load_dotenv
@@ -18,6 +19,15 @@ CORS(app)
 
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASS = os.getenv('MYSQL_PASS')
+
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
+BUCKET_NAME = os.getenv("S3_BUCKET")
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY
+)
 
 RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
 RDS_DB = os.getenv('RDS_DB')
@@ -63,12 +73,26 @@ def generate_videos():
                 "created": new_video.created
             })
         db.session.commit()
-        return jsonify({"message": "Videos generated and stored successfully", "videos": videos_to_add}), 201
+        
+        # takes captions and video files and returns urls of videos w caption
+        videos_with_caption = textoverlay(captions, uploaded_videos)
 
+        return jsonify({"message": "Videos generated and stored successfully", "videos": videos_to_add}), 201
 
     except Exception as e:
         db.session.rollback()  
         return jsonify({"error": str(e)}), 500
+
+def textoverlay(captions, videos):
+    videos_with_captions = []
+
+    for caption, video in zip(captions, videos):
+        s3_key = video.split("/")[-1]
+        processed_s3_url = text_overlay(s3, BUCKET_NAME, s3_key, caption)
+        videos_with_captions.append(processed_s3_url)
+    
+    # urls with captions
+    return videos_with_captions
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
