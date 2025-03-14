@@ -73,11 +73,14 @@ def generate_videos():
                 "created": new_video.created
             })
         db.session.commit()
-        
-        # takes captions and video files and returns urls of videos w caption
-        videos_with_caption = textoverlay(captions, uploaded_videos)
 
-        return jsonify({"message": "Videos generated and stored successfully", "videos": videos_to_add}), 201
+        captions = [] # will be generated
+        stitched_videos = []
+        
+        # takes captions and video files and returns urls of videos w caption (change to stitched videos)
+        videos_with_caption = textoverlay(captions, stitched_videos)
+
+        return jsonify({"message": "Videos generated and stored successfully", "videos": videos_with_caption}), 201
 
     except Exception as e:
         db.session.rollback()  
