@@ -8,6 +8,7 @@ import uuid
 from flask_sqlalchemy import SQLAlchemy
 from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
 from apps.backend.bulk_overlay import bulk_add_caption_to_video
+
 from text_overlay import text_overlay
 import os
 
