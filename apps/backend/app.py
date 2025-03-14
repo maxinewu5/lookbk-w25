@@ -7,21 +7,20 @@ from typing import List, Dict, Any
 import uuid
 from flask_sqlalchemy import SQLAlchemy
 from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
-
+from apps.backend.bulk_overlay import bulk_add_caption_to_video
 import os
 
 from dotenv import load_dotenv
+
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
-
-from apps.backend.bulk_overlay import bulk_add_caption_to_video
 
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASS = os.getenv('MYSQL_PASS')
 
 RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
-RDS_DB = "videosdb"
+RDS_DB = os.getenv('RDS_DB')
 #change these codes to .env later
 
 #s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
@@ -44,7 +43,6 @@ with app.app_context():
 @app.route("/api/generate-videos", methods=["POST"])
 def generate_videos():
     try:
-        # TODO: logic to create this route
         client = runwayml_login()
         files_array = generate_files_array()
         prompt = request.json.get("prompt", "person jumping with joy")
