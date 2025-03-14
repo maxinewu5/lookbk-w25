@@ -14,7 +14,6 @@ from text_overlay import text_overlay
 import os
 
 from dotenv import load_dotenv
-
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
@@ -35,7 +34,7 @@ RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
 RDS_DB = os.getenv('RDS_DB')
 #change these codes to .env later
 
-#s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
 #logging into RDS
 app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{RDS_ENDPOINT}/{RDS_DB}"
@@ -69,7 +68,7 @@ def generate_videos():
             new_video = Video(filename=filename, prompt=prompt, s3_url=s3_url)
             db.session.add(new_video)  # Add to DB session
             uploaded_videos.append({
-                "filename": filename,
+                "filename": video.split("/")[-1],
                 "s3_url": videos,
                 "prompt": prompt,
                 "created": new_video.created
@@ -78,15 +77,13 @@ def generate_videos():
 
         captions = [] # will be generated
         stitched_videos = []
-        
+
         # takes captions and video files and returns urls of videos w caption (change to stitched videos)
         videos_with_caption = textoverlay(captions, stitched_videos)
 
-        return jsonify({"message": "Videos generated and stored successfully", "videos": videos_with_caption}), 201
-
     except Exception as e:
-        db.session.rollback()  
-        return jsonify({"error": str(e)}), 500
+        db.session.rollback()
+        return jsonify({"error":str(e)}), 500
 
 def textoverlay(captions, videos):
     videos_with_captions = []
@@ -95,7 +92,7 @@ def textoverlay(captions, videos):
         s3_key = video.split("/")[-1]
         processed_s3_url = text_overlay(s3, BUCKET_NAME, s3_key, caption)
         videos_with_captions.append(processed_s3_url)
-    
+
     # urls with captions
     return videos_with_captions
 
