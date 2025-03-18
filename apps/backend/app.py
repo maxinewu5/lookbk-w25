@@ -5,21 +5,21 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any
 import uuid
-from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
 from caption_generator import CaptionGenerator
 from videofunctions import generate_hooks, runwayml_login, grab_video, generate_files_array
 from text_overlay import text_overlay
+from prisma import Prisma
 
 # Load environment variables
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Database configuration
-MYSQL_USER = os.getenv('MYSQL_USER')
-MYSQL_PASS = os.getenv('MYSQL_PASS')
+# Initialize Prisma client
+prisma = Prisma()
+prisma.connect()
 
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
@@ -30,26 +30,8 @@ s3 = boto3.client(
     aws_secret_access_key=AWS_SECRET_KEY
 )
 
-RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
-RDS_DB = "videosdb"
-
-# Configure SQLAlchemy
-app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{RDS_ENDPOINT}/{RDS_DB}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
-
 # Initialize services
 caption_generator = CaptionGenerator()
-
-class Video(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    prompt = db.Column(db.String(255), nullable=False)
-    s3_url = db.Column(db.String(500), nullable=False)
-    created = db.Column(db.DateTime, default=datetime.utcnow)
-
-with app.app_context():
-    db.create_all()
 
 @app.route("/api/generate-videos", methods=["POST"])
 def generate_videos():
@@ -72,20 +54,22 @@ def generate_videos():
 
         for video_url in videos_to_add:
             filename = video_url.split("/")[-1]
-            new_video = Video(filename=filename, prompt=prompt, s3_url=video_url)
-            db.session.add(new_video)
             
-            # Create a timestamp for the created field
-            created_time = datetime.utcnow().isoformat()
+            # Create video using Prisma
+            new_video = prisma.video.create({
+                'data': {
+                    'filename': filename,
+                    'prompt': prompt,
+                    's3_url': video_url
+                }
+            })
             
             uploaded_videos.append({
                 "filename": filename,
                 "s3_url": video_url,
                 "prompt": prompt,
-                "created": created_time
+                "created": new_video.created.isoformat()
             })
-        
-        db.session.commit()
         
         # Apply text overlay to videos
         videos_with_caption = textoverlay(captions, [video["s3_url"] for video in uploaded_videos])
@@ -99,7 +83,6 @@ def generate_videos():
         }), 201
 
     except Exception as e:
-        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 def textoverlay(captions, videos):
@@ -112,6 +95,10 @@ def textoverlay(captions, videos):
     
     # urls with captions
     return videos_with_captions
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    prisma.disconnect()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000) 
