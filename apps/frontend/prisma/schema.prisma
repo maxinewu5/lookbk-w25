@@ -9,18 +9,31 @@ datasource db {
 }
 
 model Video {
-    id String @id @default(uuid())
-    name String
-    url String
-    prompt String
-    reaction String
-    demoType String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    
-    @@index([reaction])
-    @@index([demoType])
-    @@index([createdAt])
+  id        String   @id @default(uuid())
+  filename  String
+  prompt    String
+  s3_url    String
+  caption   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model ProcessingJob {
+  id            String   @id @default(uuid())
+  status        String   // "pending", "processing", "completed", "failed"
+  prompt        String
+  demoVideoId   String
+  captions      String[]
+  generatedIds  String[]
+  finalVideoIds String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  error         String?
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model DemoVideo {
@@ -28,4 +41,15 @@ model DemoVideo {
     name String
     url String
     createdAt DateTime @default(now())
+}
+
+model GeneratedVideo {
+  id String @id @default(uuid())
+  filename String
+  prompt String
+  reaction String
+  demoType String
+  captions String[]
+  s3_url String
+  createdAt DateTime @default(now())
 }

@@ -1,5 +1,5 @@
 generator client {
-  provider             = "prisma-client-python"
+  provider             = "prisma-client-py"
   interface           = "sync"
   recursive_type_depth = 5
 }
@@ -10,9 +10,47 @@ datasource db {
 }
 
 model Video {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   filename  String
   prompt    String
   s3_url    String
-  created   DateTime @default(now())
+  caption   String?  // Optional caption for generated videos
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model ProcessingJob {
+  id            String   @id @default(uuid())
+  status        String   // "pending", "processing", "completed", "failed"
+  prompt        String
+  demoVideoId   String
+  captions      String[] // Array of generated captions
+  generatedIds  String[] // Array of generated video IDs
+  finalVideoIds String[] // Array of final stitched video IDs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  error         String?
+
+  @@index([status])
+  @@index([createdAt])
 } 
+
+model DemoVideo {
+  id String @id @default(uuid())
+  name String
+  url String
+  createdAt DateTime @default(now())
+}
+
+model GeneratedVideo {
+  id String @id @default(uuid())
+  filename String
+  prompt String
+  reaction String
+  demoType String
+  captions String[]
+  s3_url String
+  createdAt DateTime @default(now())
+}

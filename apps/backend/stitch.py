@@ -1,135 +1,174 @@
-from moviepy import *
+from moviepy.editor import VideoFileClip, concatenate_videoclips
 import os
 import requests
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import boto3
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-
+from prisma import Prisma
+from typing import List, Dict
+import asyncio
 from dotenv import load_dotenv
+
 load_dotenv()
-app = Flask(__name__)
-CORS(app)
 
-MYSQL_USER = os.getenv('MYSQL_USER')
-MYSQL_PASS = os.getenv('MYSQL_PASS')
+# Initialize Prisma client
+prisma = Prisma()
+prisma.connect()
 
+# AWS S3 setup
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
 BUCKET_NAME = os.getenv("S3_BUCKET")
+
 s3 = boto3.client(
     "s3",
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_KEY
 )
 
-RDS_ENDPOINT = os.getenv('RDS_ENDPOINT')
-RDS_DB = os.getenv('RDS_DB')
-#change these codes to .env later
-
-s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
-
-#logging into RDS
-app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{RDS_ENDPOINT}/{RDS_DB}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
-
-class Video(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    prompt = db.Column(db.String(255), nullable=False)
-    s3_url = db.Column(db.String(500), nullable=False)
-    created = db.Column(db.DateTime, default=datetime.utcnow)
-
-class ProcessedVideo(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    s3_url = db.Column(db.String(500), nullable=False)
-    created = db.Column(db.DateTime, default=datetime.utcnow)
-
-class DemoVideo(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    s3_url = db.Column(db.String(500), nullable=False)
-    uploaded = db.Column(db.DateTime, default=datetime.utcnow)
-
-#download videos from AWS (hooks only)
-def download_video(url, save_path): #requires url from server and the path to save it at
+def download_video(url: str, save_path: str) -> str:
+    """Download video from S3 URL to local path"""
     response = requests.get(url, stream=True)
     with open(save_path, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
             file.write(chunk)
-    return save_path #returns file path where it was downloaded
+    return save_path
 
-#stitch videos together
-def stitch_videos(hooks, demos):
-    # checks if number of hooks and number of demos are of parsable length (must be equal number of hooks & demos or demos must be a multiple of hooks)
-    if(len(hooks) != len(demos) | len(demos) % len(hooks) != 0):
+def stitch_videos(hook_paths: List[str], demo_paths: List[str]) -> List[str]:
+    """Stitch hook and demo videos together"""
+    if len(hook_paths) != len(demo_paths) and len(demo_paths) % len(hook_paths) != 0:
         raise ValueError("Hooks and Demos are not of parsable length.")
 
-    stitched = [None] * len(demos)
-    if(len(hooks) < len(demos)):
-        i = 0
-        while(i < len(demos) -1):
-            for hook in hooks:
-                stitch = concatenate_videoclips([hook, demos[i]])
-                stitched[i] = stitch.write_videofile(f"video{i}.mp4").with_end(17)
+    stitched_paths = []
+    output_dir = "/tmp/stitched"
+    os.makedirs(output_dir, exist_ok=True)
+
+    if len(hook_paths) < len(demo_paths):
+        for i, demo_path in enumerate(demo_paths):
+            hook_idx = i % len(hook_paths)
+            hook_clip = VideoFileClip(hook_paths[hook_idx])
+            demo_clip = VideoFileClip(demo_path)
+            
+            output_path = f"{output_dir}/stitched_{i}.mp4"
+            final_clip = concatenate_videoclips([hook_clip, demo_clip])
+            final_clip.write_videofile(output_path)
+            
+            hook_clip.close()
+            demo_clip.close()
+            final_clip.close()
+            
+            stitched_paths.append(output_path)
     else:
-        for i in range(len(hooks)):
-            stitch = concatenate_videoclips([hooks[i], demos[i]])
-            stitched[i] = stitch.write_videofile(f"video{i}.mp4").with_end(17)
+        for i in range(len(hook_paths)):
+            hook_clip = VideoFileClip(hook_paths[i])
+            demo_clip = VideoFileClip(demo_paths[i])
+            
+            output_path = f"{output_dir}/stitched_{i}.mp4"
+            final_clip = concatenate_videoclips([hook_clip, demo_clip])
+            final_clip.write_videofile(output_path)
+            
+            hook_clip.close()
+            demo_clip.close()
+            final_clip.close()
+            
+            stitched_paths.append(output_path)
 
-    return stitched #returns list of stitched video clips
+    return stitched_paths
 
-#organizes hooks and demos into lists to be stitched together
-def arrange_video(hook_list, demo_list):
-    #download hook videos from AWS
-    for i in range(len(hook_list)):
-        hook_files = [VideoFileClip(download_video(hook_list[i],f"hvid{i}.mp4"))]
-    #demo video upload
-    for i in range(len(demo_list)):
-        demo_files = [VideoFileClip(download_video(demo_list[i], f"dvid{i}.mp4"))]
-
-    #if they aren't able to be uploaded, raise error
-    if not demo_files:
-        raise FileNotFoundError("No video files found in the specified folder.")
-    if not hook_files:
-        raise ValueError("Could not upload hook files. Check if they have been properly uploaded.")
-
-    #return tuple of hook and demo files
-    return hook_files, demo_files
-
-def process_videos():
+async def process_videos(job_id: str) -> Dict:
+    """Process videos for a given job"""
     try:
-        hooks = []
-        demos = []
-        videos = Video.query.all()
-        demoVideos = DemoVideo.query.all()
+        # Update job status
+        job = prisma.processingjob.update(
+            where={'id': job_id},
+            data={'status': 'processing'}
+        )
 
-        #retrieve s3 urls for hooks and demos
-        hooks = [video.s3_url for video in videos]
-        demos = [demo.s3_url for demo in demoVideos]
+        # Get generated videos and demo video
+        generated_videos = prisma.video.find_many(
+            where={
+                'id': {'in': job.generatedIds},
+                'type': 'generated'
+            }
+        )
+        
+        demo_video = prisma.video.find_first(
+            where={
+                'id': job.demoVideoId,
+                'type': 'demo'
+            }
+        )
 
-        processed_videos = arrange_video(hooks, demos)
-        hook_list, demo_list = processed_videos
+        if not generated_videos or not demo_video:
+            raise ValueError("Missing required videos")
 
-        #stitch processed videos
-        stitches = stitch_videos(hook_list, demo_list)
+        # Download videos locally
+        hook_paths = []
+        demo_paths = []
+        
+        for video in generated_videos:
+            local_path = f"/tmp/hook_{video.id}.mp4"
+            hook_paths.append(download_video(video.s3_url, local_path))
+        
+        demo_paths = [download_video(demo_video.s3_url, f"/tmp/demo_{demo_video.id}.mp4")] * len(generated_videos)
 
-        for video_url in stitches:
-            filename = video_url.split("/")[-1]
-            new_processed_video = ProcessedVideo(
-                filename=filename,
-                s3_url=video_url
-            )
+        # Stitch videos
+        stitched_paths = stitch_videos(hook_paths, demo_paths)
 
-            # Add to the database session
-            db.session.add(new_processed_video)
+        # Upload stitched videos to S3 and save to database
+        final_video_ids = []
+        for i, path in enumerate(stitched_paths):
+            # Upload to S3
+            s3_key = f"final/stitched_{datetime.now().timestamp()}_{i}.mp4"
+            s3.upload_file(path, BUCKET_NAME, s3_key)
+            s3_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
 
-            # Commit the transaction to save the stitched videos
-        db.session.commit()
-        return jsonify({"message": "Videos stitched and stored successfully", "videos": stitches}), 201
+            # Save to database
+            final_video = prisma.video.create({
+                'data': {
+                    'filename': os.path.basename(path),
+                    'prompt': generated_videos[i].prompt,
+                    's3_url': s3_url,
+                    'type': 'final',
+                    'caption': job.captions[i] if i < len(job.captions) else None
+                }
+            })
+            final_video_ids.append(final_video.id)
+
+        # Update job with final video IDs
+        updated_job = prisma.processingjob.update(
+            where={'id': job_id},
+            data={
+                'status': 'completed',
+                'finalVideoIds': final_video_ids
+            }
+        )
+
+        # Cleanup temporary files
+        for path in hook_paths + demo_paths + stitched_paths:
+            if os.path.exists(path):
+                os.remove(path)
+
+        return {
+            "message": "Videos processed successfully",
+            "job": updated_job
+        }
+
     except Exception as e:
-        db.session.rollback()
-        return jsonify({"error":str(e)}), 500
+        # Update job with error
+        prisma.processingjob.update(
+            where={'id': job_id},
+            data={
+                'status': 'failed',
+                'error': str(e)
+            }
+        )
+        raise e
+
+    finally:
+        # Cleanup any remaining temporary files
+        for file in os.listdir("/tmp"):
+            if file.startswith(("hook_", "demo_", "stitched_")):
+                try:
+                    os.remove(os.path.join("/tmp", file))
+                except:
+                    pass
