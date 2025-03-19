@@ -17,10 +17,10 @@ export async function GET(req: Request) {
     }
 
     // Get total count for pagination
-    const total = await prisma.video.count({ where })
+    const total = await prisma.generatedVideo.count({ where })
 
     // Get videos with pagination
-    const videos = await prisma.video.findMany({
+    const videos = await prisma.generatedVideo.findMany({
       where,
       orderBy: {
         id: 'desc',
