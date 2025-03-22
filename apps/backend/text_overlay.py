@@ -1,5 +1,5 @@
-import os
-import boto3
+# import os
+# import boto3
 from moviepy.editor import VideoFileClip, CompositeVideoClip, ImageClip
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -12,7 +12,7 @@ def create_text_clip(text, size, font_size=100, font_name='Arial', text_color=(2
     # load font (will be default Arial)
     try:
         font = ImageFont.truetype(font_name, font_size)
-    except:
+    except:  # noqa: E722
         font = ImageFont.load_default()
 
     left, top, right, bottom = font.getbbox(text)

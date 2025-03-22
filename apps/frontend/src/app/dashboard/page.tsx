@@ -8,22 +8,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import VideoUploader from "@/components/video-uploader"
 import VideoPreview from "@/components/video-preview"
-import GeneratedVideos from "@/components/generated-videos"
+// import GeneratedVideos from "@/components/generated-videos"
 import { toast } from "sonner"
 import VideoGallery from "@/components/video-gallery"
-
-interface GeneratedOption {
-  id: string
-  name: string
-  url: string
-  prompt: string
-  reaction: string
-  demoType: string
-  previewUrl?: string
-  description?: string
-}
-
-type MatcherStep = "hook" | "demo"
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"generate" | "view">("generate")
@@ -31,16 +18,9 @@ export default function Dashboard() {
   const [demoType, setDemoType] = useState<string>("shazaming")
   const [prompt, setPrompt] = useState<string>("")
   const [currentVideo, setCurrentVideo] = useState<string | null>(null)
-  const [generatedVideos, setGeneratedVideos] = useState<GeneratedOption[]>([])
+  // const [generatedVideos, setGeneratedVideos] = useState<GeneratedOption[]>([])
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
   const [showCombiner, setShowCombiner] = useState<boolean>(false)
-  
-  // New states for matching step
-  const [showMatcher, setShowMatcher] = useState<boolean>(false)
-  const [generatedOptions, setGeneratedOptions] = useState<GeneratedOption[]>([])
-  const [matcherStep, setMatcherStep] = useState<MatcherStep>("hook")
-  const [selectedHook, setSelectedHook] = useState<GeneratedOption | null>(null)
-  const [originalVideo, setOriginalVideo] = useState<GeneratedOption | null>(null)
 
   const handleVideoUpload = async (videoUrl: string) => {
     setCurrentVideo(videoUrl)
@@ -69,6 +49,7 @@ export default function Dashboard() {
         throw new Error("Failed to generate video")
       }
 
+      // figure out where to put this 
       const data = await response.json()
       
       setActiveTab("view")
@@ -76,8 +57,6 @@ export default function Dashboard() {
       
       setCurrentVideo(null)
       setPrompt("")
-      setGeneratedOptions([])
-      setOriginalVideo(null)
       
     } catch (error) {
       console.error("Error generating video:", error)
@@ -87,37 +66,6 @@ export default function Dashboard() {
     } finally {
       setIsGenerating(false)
     }
-  }
-
-  const handleMatchingComplete = (selectedVideo: GeneratedOption) => {
-    if (matcherStep === "hook") {
-      setSelectedHook(selectedVideo)
-      setMatcherStep("demo")
-      return
-    }
-
-    // Here we would combine the hook and demo videos
-    const combinedVideo = {
-      ...selectedVideo,
-      name: `${selectedHook?.name}-${selectedVideo.name}`,
-      description: `Combined: ${selectedHook?.description} with ${selectedVideo.description}`
-    }
-    
-    setGeneratedVideos([...generatedVideos, combinedVideo])
-    setShowMatcher(false)
-    setMatcherStep("hook")
-    setSelectedHook(null)
-    setActiveTab("view")
-    setCurrentVideo(null)
-    setPrompt("")
-    setGeneratedOptions([])
-    setOriginalVideo(null)
-  }
-
-  const handleMatchingCancel = () => {
-    setShowMatcher(false)
-    setGeneratedOptions([])
-    setOriginalVideo(null)
   }
 
   return (
@@ -180,8 +128,8 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="border-b px-6 py-4 flex items-center justify-between bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <h2 className="text-2xl font-semibold tracking-tight">
-            {activeTab === "generate" && (showMatcher ? "Choose Generated Video" : "Generate Videos")}
-            {activeTab === "view" && (showCombiner ? "Combine Clips" : "View Generated Videos")}
+            {activeTab === "generate" && "Generate Videos"}
+            {activeTab === "view" && "View Generated Videos"}
           </h2>
           <div className="flex items-center gap-4">
             <div className="flex md:hidden">
@@ -198,7 +146,7 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 overflow-auto p-6 bg-muted/20">
-          {activeTab === "generate" && !showMatcher && (
+          {activeTab === "generate" && (
             <div className="h-full flex flex-col">
               <div className="flex-1 overflow-auto">
                 <div className="grid gap-8 md:grid-cols-2 mb-4">

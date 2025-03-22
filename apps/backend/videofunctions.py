@@ -3,13 +3,29 @@ import os
 import time
 import requests
 import boto3
-import uuid
+# import uuid
 from botocore.config import Config
 import base64
 from dotenv import load_dotenv
 load_dotenv()
 
+#s3 bucket information and access
+S3_BUCKET = "lookbk-video-bucket"
+S3_REGION = "us-west-1"
+AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
+AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')
+#video_filename = os.path.join(output_folder, link.split("/")[-1].split("?")[0])
 
+if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
+  raise ValueError("AWS credentials not found. Check your .env file or environment variables.")
+
+s3_client = boto3.client(
+  "s3",
+  aws_access_key_id=AWS_ACCESS_KEY,
+  aws_secret_access_key=AWS_SECRET_KEY,
+  region_name=S3_REGION,
+  config=Config(signature_version="s3v4")
+)
 
 def runwayml_login():
   RUNWAYML_API_KEY = os.getenv('RUNWAYML_API_KEY')
@@ -23,24 +39,6 @@ def generate_files_array():
   return files_array
 
 def grab_video(link, names3):
-  #s3 bucket information and access
-  S3_BUCKET = "lookbk-video-bucket"
-  S3_REGION = "us-west-1"
-  AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
-  AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')
-  #video_filename = os.path.join(output_folder, link.split("/")[-1].split("?")[0])
-
-  if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
-    raise ValueError("AWS credentials not found. Check your .env file or environment variables.")
-
-  s3_client = boto3.client(
-    "s3",
-    aws_access_key_id=AWS_ACCESS_KEY,
-    aws_secret_access_key=AWS_SECRET_KEY,
-    region_name=S3_REGION,
-    config=Config(signature_version="s3v4")
-  )
-
   # Stream video from URL
   response = requests.get(link, stream=True)
   response.raise_for_status()

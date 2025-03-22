@@ -5,7 +5,7 @@ import boto3
 from datetime import datetime
 from prisma import Prisma
 from typing import List, Dict
-import asyncio
+# import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -170,5 +170,5 @@ async def process_videos(job_id: str) -> Dict:
             if file.startswith(("hook_", "demo_", "stitched_")):
                 try:
                     os.remove(os.path.join("/tmp", file))
-                except:
+                except:  # noqa: E722
                     pass

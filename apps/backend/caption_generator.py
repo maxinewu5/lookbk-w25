@@ -1,7 +1,7 @@
 import openai
 import os
 from typing import List, Optional
-from flask import request, jsonify
+# from flask import request, jsonify
 
 class CaptionGenerator:
     def __init__(self):

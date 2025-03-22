@@ -39,7 +39,7 @@ The server will run on `http://localhost:5000`
 
 ### Generate Videos
 `POST /api/generate-videos`
-
+`GET /api/job-status/<job_id>`
 
 ## Development
 
